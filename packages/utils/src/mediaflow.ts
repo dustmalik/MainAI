@@ -106,16 +106,22 @@ export async function getMediaFlowPublicIp(
       return cachedPublicIp;
     }
 
-    console.debug(
-      '|DBG| mediaflow > getMediaFlowPublicIp > GET /proxy/ip?api_password=***'
-    );
-
     const proxyIpUrl = mediaFlowUrl;
     const proxyIpPath = '/proxy/ip';
     proxyIpUrl.pathname = `${proxyIpUrl.pathname === '/' ? '' : proxyIpUrl.pathname}${proxyIpPath}`;
     proxyIpUrl.search = new URLSearchParams({
       api_password: mediaFlowConfig.apiPassword,
     }).toString();
+
+    if (Settings.LOG_SENSITIVE_INFO) {
+      console.debug(
+        `|DBG| mediaflow > getMediaFlowPublicIp > GET ${proxyIpUrl.toString()}`
+      );
+    } else {
+      console.debug(
+        '|DBG| mediaflow > getMediaFlowPublicIp > GET /proxy/ip?api_password=***'
+      );
+    }
 
     const response = await fetch(proxyIpUrl.toString(), {
       method: 'GET',
@@ -136,9 +142,7 @@ export async function getMediaFlowPublicIp(
     }
     return publicIp;
   } catch (error: any) {
-    console.error(
-      `|ERR| mediaflow > getMediaFlowPublicIp > Failed to get public IP from MediaFlow - ${error.message}`
-    );
+    console.error(`|ERR| mediaflow > getMediaFlowPublicIp > ${error.message}`);
     return null;
   }
 }
