@@ -98,7 +98,7 @@ export async function getMediaFlowPublicIp(
     const cacheKey = getTextHash(
       `mediaFlowPublicIp:${mediaFlowConfig.proxyUrl}:${mediaFlowConfig.apiPassword}`
     );
-    const cachedPublicIp = cache.get(cacheKey);
+    const cachedPublicIp = cache ? cache.get(cacheKey) : null;
     if (cachedPublicIp) {
       console.debug(
         `|DBG| mediaflow > getMediaFlowPublicIp > Returning cached public IP`
@@ -131,8 +131,8 @@ export async function getMediaFlowPublicIp(
 
     const data = await response.json();
     const publicIp = data.ip;
-    if (publicIp) {
-      cache.set(cacheKey, publicIp, 900);
+    if (publicIp && cache) {
+      cache.set(cacheKey, publicIp, Settings.CACHE_MEDIAFLOW_IP_TTL);
     }
     return publicIp;
   } catch (error: any) {

@@ -89,7 +89,7 @@ export class BaseWrapper {
     const url = this.getStreamUrl(streamRequest);
     const cache = this.userConfig.instanceCache;
     const requestCacheKey = getTextHash(url);
-    const cachedStreams = cache.get(requestCacheKey);
+    const cachedStreams = cache ? cache.get(requestCacheKey) : undefined;
     const sanitisedUrl =
       new URL(url).hostname + '/****/' + new URL(url).pathname.split('/').pop();
     if (cachedStreams) {
@@ -156,7 +156,13 @@ export class BaseWrapper {
       if (!results.streams) {
         throw new Error('Failed to respond with streams');
       }
-      cache.set(requestCacheKey, results.streams, 600); // cache for 10 minutes
+      if (Settings.CACHE_STREAM_RESULTS && cache) {
+        cache.set(
+          requestCacheKey,
+          results.streams,
+          Settings.CACHE_STREAM_RESULTS_TTL
+        );
+      }
       return results.streams;
     } catch (error: any) {
       clearTimeout(timeout);
@@ -202,6 +208,15 @@ export class BaseWrapper {
       indexers: indexer,
       duration: duration,
       personal: personal,
+      type: stream.infoHash
+        ? 'p2p'
+        : usenetAge
+          ? 'usenet'
+          : provider
+            ? 'debrid'
+            : stream.url?.endsWith('.m3u8')
+              ? 'live'
+              : 'unknown',
       stream: {
         subtitles: stream.subtitles,
         behaviorHints: {
@@ -305,6 +320,10 @@ export class BaseWrapper {
         }
       });
 
+    const resolution = this.extractResolution(stream.name || '');
+    if (resolution && parsedInfo.resolution === 'Unknown') {
+      parsedInfo.resolution = resolution;
+    }
     const duration = stream.duration || this.extractDurationInMs(description);
     // look for providers
     let provider: ParsedStream['provider'] = this.parseServiceData(
@@ -346,7 +365,7 @@ export class BaseWrapper {
       );
       // check if the string contains the regex
       if (regex.test(cleanString)) {
-        let cached: boolean | undefined = undefined;
+        let cached: boolean = false;
         // check if any of the uncachedSymbols are in the string
         if (uncachedSymbols.some((symbol) => string.includes(symbol))) {
           cached = false;
@@ -364,6 +383,34 @@ export class BaseWrapper {
     });
     return provider;
   }
+
+  protected extractResolution(string: string): string | undefined {
+    const resolutionPattern = /(?:\d{3,4}p|SD|HD|FHD|UHD|4K|8K)/i;
+    const match = string.match(resolutionPattern);
+
+    if (!match) return undefined;
+
+    const resolution = match[0].toUpperCase();
+    switch (resolution) {
+      case '480P':
+      case 'SD':
+        return '480p';
+      case '720P':
+      case 'HD':
+        return '720p';
+      case '1080P':
+      case '960P':
+      case 'FHD':
+        return '1080p';
+      case 'UHD':
+      case '4K':
+      case '2160P':
+        return '2160p';
+      default:
+        return resolution;
+    }
+  }
+
   protected extractSizeInBytes(string: string, k: number): number {
     const sizePattern = /(\d+(\.\d+)?)\s?(KB|MB|GB)/i;
     const match = string.match(sizePattern);
